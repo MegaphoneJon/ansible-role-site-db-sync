@@ -108,7 +108,7 @@
 
 # FIXME: This is provisionally replaced with a perl find/replace in db sync
 - name: Do a search/replace for the primary URL
-  command: perl -pi -e 's/{{ canonical_primary_url }}/{{ primary_url }}/g' {{ canonical_cms_db_name }}.sql
+  command: perl -pi -e 's~{{ canonical_primary_url }}~{{ primary_url }}~g' {{ canonical_cms_db_name }}.sql
   args:
     chdir: "{{ sql_dumps_dir }}"
   when: cms == 'WordPress' and canonical_primary_url
