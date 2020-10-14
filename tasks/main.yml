@@ -4,8 +4,6 @@
   set_fact:
     from_site: "{{ from|default(canonical_primary_url) }}"
 
-- debug: var=hostvars['connect.crcl.org']
-
 - name: create a list of db names
   set_fact:
     canonical_db_names:
@@ -22,26 +20,34 @@
     canonical_db_names_unique: "{{ canonical_db_names | unique }}"
     db_names_unique: "{{ db_names | unique }}"
 
-# Normally, sql-dumps is parallel with the webroot.  In certain situations (when gitroot is above webroot) this folder may not exists and creating it screws up git cloning.  So we'll use a temp dir in that situation.
-- name: Check if sql-dumps dir exists
+# Normally, sql-dumps is parallel with the webroot.  In certain situations (when gitroot is above webroot) this folder may not exists and creating it screws up git cloning.  
+# In that situation, we'll use a temp directory and create sql-dumps next time, once we have a .gitignore in place.
+- name: Check if .gitignore exists
   stat:
-    path: "{{ webroot }}/../sql-dumps"
-  register: dumps_dir_exists
+    path: "{{ gitroot }}/.gitignore"
+  register: gitignore
 
-- name: Set the sql-dumps directory var
-  set_fact:
-    sql_dumps_dir: "{{ webroot + '/../sql-dumps' if dumps_dir_exists.stat.exists else '/tmp' }}"
-
-# MySQL restore
 - name: Create sql-dumps folder
   file:
     owner: "{{ run_as_user }}"
     group: "{{ run_as_user }}"
-    path: "{{ sql_dumps_dir }}"
+    path: "{{ webroot }}/../sql-dumps"
     state: directory
     mode: 02770
-  become_user: root
+  become_user: "{{ run_as_user }}"
+  when: webroot == gitroot or gitignore.stat.exists
 
+- name: Check if sql-dumps dir exists
+  stat:
+    path: "{{ webroot }}/../sql-dumps"
+  register: dumps_dir
+
+- name: Set the sql-dumps directory var
+  set_fact:
+    sql_dumps_dir: "{{ webroot + '/../sql-dumps' if dumps_dir.stat.exists else '/tmp' }}"
+
+
+# MySQL restore
 - name: Check if db dump files already exist
   stat:
     path: "{{ sql_dumps_dir }}/{{ canonical_cms_db_name }}.sql"
