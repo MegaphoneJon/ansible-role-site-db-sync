@@ -35,7 +35,7 @@
     state: directory
     mode: 02770
   become_user: "{{ run_as_user }}"
-  when: webroot == gitroot or gitignore.stat.exists
+  when: gitignore.stat.exists
 
 - name: Check if sql-dumps dir exists
   stat:
