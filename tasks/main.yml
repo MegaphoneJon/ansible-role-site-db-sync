@@ -60,41 +60,70 @@
       - "canonical_hostname is none or (db_dump.stat.exists == true and (ansible_date_time.epoch|int - db_dump.stat.mtime) < (60 * 60 * 24))"
     msg: "yes"
   failed_when: false
-  register: restore_db_backup
+  register: acquire_db_backup
 
-# This is so fucking ugly. Newer versions of borgbackup eliminate the need for piping to tail and cut, but we probably won't have them until Debian 10 ships.
-- name: Get the latest backup archive name
-  shell: borg list --remote-path /usr/local/bin/borg1/borg1 {{ rsyncnet_user }}@{{ rsyncnet_server }}:{{ canonical_server_client + '-' + canonical_hostname }} | tail -n1 | cut -f 1 -d ' '
-  environment:
-    BORG_PASSPHRASE: "{{ lookup('passwordstore', canonical_server_client + '/' + canonical_hostname + '/borg/remote') }}"
-  args:
-    chdir: "{{ sql_dumps_dir }}"
-  register: archive_name
-  changed_when: false
-  when: restore_db_backup.msg == "yes"
-  become_user: root
+# Acquire a backup from rsync.net
+- block:
+  # This is so fucking ugly. Newer versions of borgbackup eliminate the need for piping to tail and cut, but we probably won't have them until Debian 10 ships.
+  - name: Get the latest backup archive name
+    shell: borg list --remote-path /usr/local/bin/borg1/borg1 {{ rsyncnet_user }}@{{ rsyncnet_server }}:{{ canonical_server_client + '-' + canonical_hostname }} | tail -n1 | cut -f 1 -d ' '
+    environment:
+      BORG_PASSPHRASE: "{{ lookup('passwordstore', canonical_server_client + '/' + canonical_hostname + '/borg/remote') }}"
+    args:
+      chdir: "{{ sql_dumps_dir }}"
+    register: archive_name
+    changed_when: false
+    become_user: root
 
-# Download the borg backup of the db dump if we need an update and the borg backup exists.
-- name: Download the latest copy of the database
-  shell: borg extract --strip-components 4 --remote-path /usr/local/bin/borg1/borg1 {{ rsyncnet_user }}@{{ rsyncnet_server }}:{{ canonical_server_client + '-' + canonical_hostname }}::{{ archive_name.stdout }} var/backups/mysql/sqldump/{{ db_name }}.sql.gz
-  args:
-    chdir: "{{ sql_dumps_dir }}"
-  environment:
-    BORG_PASSPHRASE: "{{ lookup('passwordstore', canonical_server_client + '/' + canonical_hostname + '/borg/remote') }}"
-  with_items: "{{ canonical_db_names_unique }}"
-  register: db_downloaded
-  loop_control:
-    loop_var: db_name
-  when: restore_db_backup.msg == "yes" and archive_name.skipped is not defined
-  become_user: root
+  # Download the borg backup of the db dump if we need an update and the borg backup exists.
+  - name: Download the latest copy of the database
+    shell: borg extract --strip-components 4 --remote-path /usr/local/bin/borg1/borg1 {{ rsyncnet_user }}@{{ rsyncnet_server }}:{{ canonical_server_client + '-' + canonical_hostname }}::{{ archive_name.stdout }} var/backups/mysql/sqldump/{{ db_name }}.sql.gz
+    args:
+      chdir: "{{ sql_dumps_dir }}"
+    environment:
+      BORG_PASSPHRASE: "{{ lookup('passwordstore', canonical_server_client + '/' + canonical_hostname + '/borg/remote') }}"
+    with_items: "{{ canonical_db_names_unique }}"
+    register: db_downloaded
+    loop_control:
+      loop_var: db_name
+    when: archive_name.skipped is not defined
+    become_user: root
 
-- name: Decompress the db backups
-  shell: gunzip --force {{ item }}.sql.gz
-  args:
-    chdir: "{{ sql_dumps_dir }}"
-  with_items: "{{ canonical_db_names_unique }}"
-  when: restore_db_backup.msg == "yes" and archive_name.skipped is not defined
-  become_user: root
+  - name: Decompress the db backups
+    shell: gunzip --force {{ item }}.sql.gz
+    args:
+      chdir: "{{ sql_dumps_dir }}"
+    with_items: "{{ canonical_db_names_unique }}"
+    when: acquire_db_backup.msg == "yes" and archive_name.skipped is not defined
+    become_user: root
+  when: acquire_db_backup.msg == "yes" and db_sync_strategy == 'rsyncnet'
+
+# Acquire a backup from a mysqldump
+- block:
+  - name: Make a db backup
+    mysql_db:
+      state: dump
+      login_user: "{{ canonical_db_user }}"
+      login_password: "{{ lookup('passwordstore', canonical_server_client + '/' + canonical_hostname + '/' + canonical_bare_url + '/mysql') }}"
+      name: "{{ db_name }}"
+      target: "/tmp/{{ db_name }}.sql"
+    with_items: "{{ canonical_db_names_unique }}"
+    loop_control:
+      loop_var: db_name
+
+  - name: fetch db backups
+    fetch:
+      src: "/tmp/{{ db_name }}.sql"
+      dest: "{{ sql_dumps_dir }}/{{ db_name }}.sql"
+      flat: yes
+    with_items: "{{ canonical_db_names_unique }}"
+    loop_control:
+      loop_var: db_name
+
+  when: acquire_db_backup.msg == "yes" and db_sync_strategy == 'livedump'
+  delegate_to: "{{ canonical_server }}"
+  remote_user: "{{ canonical_run_as_user }}"
+  become: no
 
 # Don't do these other steps if a) there's no db backup in borg b) the db is already downloaded.
 # FIXME: We don't have a way of telling whether the db dump has been loaded or not, which is what we really need.  Figure out a command to determine that, then change the "when" on the next 4 tasks.
@@ -102,14 +131,14 @@
   command: perl -pi -e 's#\/\*\!5001. DEFINER=`.*`@`.*?\*\/##g' {{ canonical_crm_db_name }}.sql
   args:
     chdir: "{{ sql_dumps_dir }}"
-  when: restore_db_backup.msg == "yes" and archive_name.skipped is not defined
+  when: acquire_db_backup.msg == "yes" and archive_name.skipped is not defined
   become_user: root
 
 - name: Fix logging db triggers when using a separate db
   command: perl -pi -e 's/{{ canonical_crm_logging_db_name }}/{{ crm_logging_db_name }}/g' {{ canonical_crm_db_name }}.sql
   args:
     chdir: "{{ sql_dumps_dir }}"
-  when: restore_db_backup.msg == "yes" and archive_name.skipped is not defined and canonical_crm_logging_db_name is not none
+  when: acquire_db_backup.msg == "yes" and archive_name.skipped is not defined and canonical_crm_logging_db_name is not none
   become_user: root
 
 # FIXME: This is provisionally replaced with a perl find/replace in db sync
@@ -127,7 +156,7 @@
     state: import
     login_user: "{{ db_user }}"
     login_password: "{{ lookup('passwordstore', client + '/' + hostname + '/' + bare_url + '/mysql') }}"
-  when: restore_db_backup.msg == "yes" and archive_name.skipped is not defined and civicrm == 'Yes' and item.1 is defined
+  when: acquire_db_backup.msg == "yes" and archive_name.skipped is not defined and civicrm == 'Yes' and item.1 is defined
   become_user: root
   with_together:
    - "{{ canonical_db_names_unique }}"
