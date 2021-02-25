@@ -86,7 +86,6 @@
     register: db_downloaded
     loop_control:
       loop_var: db_name
-    when: archive_name.skipped is not defined
     become_user: root
 
   - name: Decompress the db backups
@@ -94,7 +93,7 @@
     args:
       chdir: "{{ sql_dumps_dir }}"
     with_items: "{{ canonical_db_names_unique }}"
-    when: acquire_db_backup.msg == "yes" and archive_name.skipped is not defined
+    when: acquire_db_backup.msg == "yes"
     become_user: root
   when: acquire_db_backup.msg == "yes" and db_sync_strategy == 'rsyncnet'
 
@@ -131,14 +130,14 @@
   command: perl -pi -e 's#\/\*\!5001. DEFINER=`.*`@`.*?\*\/##g' {{ canonical_crm_db_name }}.sql
   args:
     chdir: "{{ sql_dumps_dir }}"
-  when: acquire_db_backup.msg == "yes" and archive_name.skipped is not defined
+  when: acquire_db_backup.msg == "yes"
   become_user: root
 
 - name: Fix logging db triggers when using a separate db
   command: perl -pi -e 's/{{ canonical_crm_logging_db_name }}/{{ crm_logging_db_name }}/g' {{ canonical_crm_db_name }}.sql
   args:
     chdir: "{{ sql_dumps_dir }}"
-  when: acquire_db_backup.msg == "yes" and archive_name.skipped is not defined and canonical_crm_logging_db_name is not none
+  when: acquire_db_backup.msg == "yes" and canonical_crm_logging_db_name is not none
   become_user: root
 
 # FIXME: This is provisionally replaced with a perl find/replace in db sync
@@ -156,15 +155,8 @@
     state: import
     login_user: "{{ db_user }}"
     login_password: "{{ lookup('passwordstore', client + '/' + hostname + '/' + bare_url + '/mysql') }}"
-  when: acquire_db_backup.msg == "yes" and archive_name.skipped is not defined and civicrm == 'Yes' and item.1 is defined
+  when: acquire_db_backup.msg == "yes" and civicrm == 'Yes' and item.1 is defined
   become_user: root
   with_together:
    - "{{ canonical_db_names_unique }}"
    - "{{ db_names_unique }}"
-
-# - name: Get the "from" database names
-# - name: Get the "to" database names
-# - name: Back up the "to" databases
-# - name: Dump the "from" databases
-# - name: Load the copied dumps
-# - name: Delete old backups
