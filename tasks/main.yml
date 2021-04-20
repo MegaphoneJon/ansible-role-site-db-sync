@@ -140,7 +140,6 @@
   when: acquire_db_backup.msg == "yes" and canonical_crm_logging_db_name is not none
   become_user: root
 
-# FIXME: This is provisionally replaced with a perl find/replace in db sync
 - name: Do a search/replace for the primary URL
   command: perl -pi -e 's~{{ canonical_primary_url }}~{{ primary_url }}~g' {{ canonical_cms_db_name }}.sql
   args:
@@ -163,4 +162,4 @@
 
 - name: Turn off Nagios cron check on dev/test sites
   command: "drush --root={{ webroot }} -y vset nagios_func_cron 0"
-  when: cms == 'Drupal' and env != 'Live'
+  when: cms == 'Drupal' and env != 'Live' and acquire_db_backup.msg == "yes"
