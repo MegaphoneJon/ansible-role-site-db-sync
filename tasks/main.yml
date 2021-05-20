@@ -1,4 +1,7 @@
 ---
+- name: Check if Drupal has been installed yet
+  command: "drush --root={{ webroot }} -y core-status bootstrap"
+  register: drupal_installed
 
 - name: Get the "from" site
   set_fact:
@@ -162,4 +165,4 @@
 
 - name: Turn off Nagios cron check on dev/test sites
   command: "drush --root={{ webroot }} -y vset nagios_func_cron 0"
-  when: cms == 'Drupal' and env != 'Live'
+  when: cms == 'Drupal' and env != 'Live' and drupal_installed is search("Successful")
