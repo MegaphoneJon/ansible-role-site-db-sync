@@ -150,6 +150,12 @@
   when: cms == 'WordPress' and canonical_primary_url
   become_user: root
 
+- name: Ensure the CMS is installed
+  stat:
+    path: "{{ webroot }}/index.php"
+  register: cms_exists
+
+# FIXME: This won't work if there's no CiviCRM.
 - name: Import the databases
   mysql_db:
     name: "{{ item.1 }}"
@@ -157,7 +163,8 @@
     state: import
     login_user: "{{ db_user }}"
     login_password: "{{ lookup('passwordstore', client + '/' + hostname + '/' + bare_url + '/mysql') }}"
-  when: civicrm == 'Yes' and item.1 is defined
+  when: civicrm == 'Yes' and item.1 is defined and cms_exists.stat is defined and cms_exists.stat.exists == true
+
   become_user: root
   with_together:
    - "{{ canonical_db_names_unique }}"
