@@ -173,3 +173,9 @@
 - name: Turn off Nagios cron check on dev/test sites
   command: "drush --root={{ webroot }} -y vset nagios_func_cron 0"
   when: cms == 'Drupal' and env != 'Live' and drupal_installed is search("Successful")
+
+- name: Fix wp-load setting
+  command: wp eval '$c = new CiviCRM_For_WordPress_Admin; $c->add_wpload_setting();' --path={{ webroot }}
+  become: "{{ run_as_user }}"
+  when: cms == 'WordPress'
+  ignore_errors: yes
