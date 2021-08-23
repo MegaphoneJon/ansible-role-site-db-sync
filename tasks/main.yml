@@ -34,7 +34,7 @@
   file:
     owner: "{{ run_as_user }}"
     group: "{{ run_as_user }}"
-    path: "{{ webroot }}/../sql-dumps"
+    path: "{{ sqldumps_path }}"
     state: directory
     mode: 02770
   become_user: "{{ run_as_user }}"
@@ -42,12 +42,12 @@
 
 - name: Check if sql-dumps dir exists
   stat:
-    path: "{{ webroot }}/../sql-dumps"
+    path: "{{ sqldumps_path }}"
   register: dumps_dir
 
 - name: Set the sql-dumps directory var
   set_fact:
-    sql_dumps_dir: "{{ webroot + '/../sql-dumps' if dumps_dir.stat.exists else '/tmp' }}"
+    sql_dumps_dir: "{{ sqldumps_path if dumps_dir.stat.exists else '/tmp' }}"
 
 
 # MySQL restore
@@ -133,14 +133,13 @@
   command: perl -pi -e 's#\/\*\!5001. DEFINER=`.*`@`.*?\*\/##g' {{ canonical_crm_db_name }}.sql
   args:
     chdir: "{{ sql_dumps_dir }}"
-  when: acquire_db_backup.msg == "yes"
   become_user: root
 
 - name: Fix logging db triggers when using a separate db
   command: perl -pi -e 's/{{ canonical_crm_logging_db_name }}/{{ crm_logging_db_name }}/g' {{ canonical_crm_db_name }}.sql
   args:
     chdir: "{{ sql_dumps_dir }}"
-  when: acquire_db_backup.msg == "yes" and canonical_crm_logging_db_name is not none
+  when: canonical_crm_logging_db_name is not none
   become_user: root
 
 - name: Do a search/replace for the primary URL
@@ -175,7 +174,7 @@
   when: cms == 'Drupal' and env != 'Live' and drupal_installed is search("Successful")
 
 - name: Fix wp-load setting
-  command: wp eval '$c = new CiviCRM_For_WordPress_Admin; $c->add_wpload_setting();' --path={{ webroot }}
+  command: wp eval '$c=[civi_wp()->admin, "add_wpload_setting"]; if (is_callable($c)) $c();' --path={{ webroot }}
   become: "{{ run_as_user }}"
   when: cms == 'WordPress'
   ignore_errors: yes
