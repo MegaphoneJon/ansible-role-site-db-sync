@@ -109,6 +109,7 @@
       login_password: "{{ lookup('passwordstore', canonical_server_client + '/' + canonical_hostname + '/' + canonical_bare_url + '/mysql') }}"
       name: "{{ db_name }}"
       target: "/tmp/{{ db_name }}.sql"
+      dump_extra_args: --single-transaction=TRUE
     with_items: "{{ canonical_db_names_unique }}"
     loop_control:
       loop_var: db_name
