@@ -2,12 +2,12 @@
 - name: Check if Drupal has been installed yet
   command: "drush --root={{ webroot }} -y core-status bootstrap"
   register: drupal_installed
-  when: cms == 'Drupal' or cms == 'Drupal8'
+  when: cms == 'Drupal'
 
 - name: Check if WordPress has been installed yet
   command: "wp core is-installed --path={{ webroot }}"
   register: wordpress_installed
-  when: cms == 'WordPress' or cms == 'Drupal8'
+  when: cms == 'WordPress'
   become_user: "{{ run_as_user }}"
 
 - name: Get the "from" site
