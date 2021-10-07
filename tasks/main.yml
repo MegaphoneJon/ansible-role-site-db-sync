@@ -151,19 +151,11 @@
   when: canonical_crm_logging_db_name is not none
   become_user: root
 
-- name: Do a search/replace for the primary URL
-  command: perl -pi -e 's~{{ canonical_primary_url }}~{{ primary_url }}~g' {{ canonical_cms_db_name }}.sql
-  args:
-    chdir: "{{ sql_dumps_dir }}"
-  when: cms == 'WordPress' and canonical_primary_url
-  become_user: root
-
 - name: Ensure the CMS is installed
   stat:
     path: "{{ webroot }}/index.php"
   register: cms_exists
 
-# FIXME: This won't work if there's no CiviCRM.
 - name: Import the databases
   mysql_db:
     name: "{{ item.1 }}"
@@ -184,6 +176,12 @@
 
 - name: Fix wp-load setting
   command: wp eval '$c=[civi_wp()->admin, "add_wpload_setting"]; if (is_callable($c)) $c();' --path={{ webroot }}
+  become_user: "{{ run_as_user }}"
+  when: cms == 'WordPress' and wordpress_installed.rc == 0
+  ignore_errors: yes
+
+- name: Do a search/replace for the primary URL
+  command: "wp search-replace {{ canonical_primary_url }} {{ primary_url }} --path={{ webroot }}"
   become_user: "{{ run_as_user }}"
   when: cms == 'WordPress' and wordpress_installed.rc == 0
   ignore_errors: yes
