@@ -25,10 +25,10 @@
       - "{{ crm_db_name }}"
       - "{{ crm_logging_db_name | default(crm_db_name, true) }}"
 
-- name: create a list of unique db names
+- name: create a list of unique db names, removing blanks
   set_fact:
-    canonical_db_names_unique: "{{ canonical_db_names | unique }}"
-    db_names_unique: "{{ db_names | unique }}"
+    canonical_db_names_unique: "{{ canonical_db_names | select() | unique }}"
+    db_names_unique: "{{ db_names | select() | unique }}"
 
 # Normally, sql-dumps is parallel with the webroot.  In certain situations (when gitroot is above webroot) this folder may not exists and creating it screws up git cloning.  
 # In that situation, we'll use a temp directory and create sql-dumps next time, once we have a .gitignore in place.
