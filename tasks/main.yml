@@ -136,8 +136,17 @@
   remote_user: "{{ canonical_run_as_user }}"
   become: no
 
-# Don't do these other steps if a) there's no db backup in borg b) the db is already downloaded.
-# FIXME: We don't have a way of telling whether the db dump has been loaded or not, which is what we really need.  Figure out a command to determine that, then change the "when" on the next 4 tasks.
+- name: Set owner/group for db dumps
+  ansible.builtin.file:
+    path: "{{ sql_dumps_dir }}/{{ db_name }}.sql"
+    owner: "{{ run_as_user }}"
+    group: "{{ run_as_user }}"
+    mode: 660
+  with_items: "{{ canonical_db_names_unique }}"
+  become_user: root
+  loop_control:
+    loop_var: db_name
+
 - name: Remove definers from Civi db
   command: perl -pi -e 's#\/\*\!5001. DEFINER=`.*`@`.*?\*\/##g' {{ canonical_crm_db_name }}.sql
   args:
