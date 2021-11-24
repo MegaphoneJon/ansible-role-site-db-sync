@@ -9,6 +9,7 @@
   register: wordpress_installed
   when: cms == 'WordPress'
   become_user: "{{ run_as_user }}"
+  failed_when: false
 
 - name: Get the "from" site
   set_fact:
@@ -141,7 +142,7 @@
     path: "{{ sql_dumps_dir }}/{{ db_name }}.sql"
     owner: "{{ run_as_user }}"
     group: "{{ run_as_user }}"
-    mode: 660
+    mode: 0660
   with_items: "{{ canonical_db_names_unique }}"
   become_user: root
   loop_control:
