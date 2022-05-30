@@ -115,6 +115,7 @@
       state: dump
       login_user: "{{ canonical_db_user }}"
       login_password: "{{ lookup('passwordstore', canonical_server_client + '/' + canonical_hostname + '/' + canonical_bare_url + '/mysql') }}"
+      login_host: "{{ remote_mysql_host }}"
       name: "{{ db_name }}"
       target: "/tmp/{{ db_name }}.sql"
       dump_extra_args: --single-transaction=TRUE
@@ -210,7 +211,7 @@
 - name: Fix wp-load setting
   command: wp eval '$c=[civi_wp()->admin, "add_wpload_setting"]; if (is_callable($c)) $c();' --path={{ webroot }}
   become_user: "{{ run_as_user }}"
-  when: cms == 'WordPress' and wordpress_installed.rc == 0
+  when: cms == 'WordPress' and wordpress_installed.rc == 0 and civicrm == 'Yes'
   ignore_errors: yes
 
 - name: Do a search/replace for the primary URL
