@@ -172,18 +172,20 @@
   args:
     chdir: "{{ sql_dumps_dir }}"
   become_user: root
+  when: civicrm == 'Yes'
 
 - name: Remove function definers from Civi db
   command: perl -pi -e 's/CREATE DEFINER.*FUNCTION/CREATE FUNCTION/g' {{ canonical_crm_db_name }}.sql
   args:
     chdir: "{{ sql_dumps_dir }}"
   become_user: root
+  when: civicrm == 'Yes'
 
 - name: Fix logging db triggers when using a separate db
   command: perl -pi -e 's/{{ canonical_crm_logging_db_name }}/{{ crm_logging_db_name }}/g' {{ canonical_crm_db_name }}.sql
   args:
     chdir: "{{ sql_dumps_dir }}"
-  when: canonical_crm_logging_db_name is not none
+  when: canonical_crm_logging_db_name is not none and civicrm == 'Yes'
   become_user: root
 
 - name: Ensure the CMS is installed
