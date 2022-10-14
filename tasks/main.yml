@@ -87,8 +87,13 @@
     become_user: root
 
   # Download the borg backup of the db dump if we need an update and the borg backup exists.
+  # Also very ugly.  Borg doesn't allow specifying a destination path, so we use strip-components, but need to figure out how many components the path has.
+  - name: Get depth of backup path.
+    set_fact:
+      path_depth: "{{ canonical_database_backup_path | default('var/backups/mysql/sqldump',true) | regex_replace('[^\/]', '') | count + 1 }}"
+
   - name: Download the latest copy of the database
-    shell: borg extract --strip-components 4 --remote-path /usr/local/bin/borg1/borg1 {{ rsyncnet_user }}@{{ rsyncnet_server }}:{{ canonical_server_client + '-' + canonical_hostname }}::{{ archive_name.stdout }} var/backups/mysql/sqldump/{{ db_name }}.sql.gz
+    shell: borg extract --strip-components {{ path_depth }} --remote-path /usr/local/bin/borg1/borg1 {{ rsyncnet_user }}@{{ rsyncnet_server }}:{{ canonical_server_client + '-' + canonical_hostname }}::{{ archive_name.stdout }} {{ canonical_database_backup_path | default("var/backups/mysql/sqldump",true) }}/{{ db_name }}.sql.gz
     args:
       chdir: "{{ sql_dumps_dir }}"
     environment:
