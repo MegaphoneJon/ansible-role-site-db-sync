@@ -1,4 +1,34 @@
 ---
+- name: Ensure file owner/perms are correct
+  file:
+    path: "{{ webroot }}"
+    state: directory
+    mode: ug+rw
+    owner: "{{ run_as_user }}"
+    group: "{{ run_as_user }}"
+    recurse: yes
+  become: yes
+
+- name: git pull
+  git:
+    repo: "{{ git_repo_url }}"
+    dest: "{{ gitroot }}"
+    version: "{{ git_main_branch }}"
+    track_submodules: no
+  become: yes
+  become_user: "{{ run_as_user }}"
+  when: git_repo_name is not none
+
+# Currently the Ansible source code hard-codes the assumption that your branch is called "master".  When that's fixed, we can remove this and just set `track_submodules` to "yes" above.
+- name: git submodule update
+  shell: git submodule update --remote
+  args:
+    chdir: "{{ gitroot }}"
+  changed_when: false
+  become: yes
+  become_user: "{{ run_as_user }}"
+  when: git_repo_name is not none
+
 - name: Check if Drupal has been installed yet
   command: "drush --root={{ webroot }} -y core-status bootstrap"
   register: drupal_installed
@@ -75,9 +105,8 @@
 
 # Acquire a backup from rsync.net
 - block:
-  # This is so fucking ugly. Newer versions of borgbackup eliminate the need for piping to tail and cut, but we probably won't have them until Debian 10 ships.
   - name: Get the latest backup archive name
-    shell: borg list --remote-path /usr/local/bin/borg1/borg1 {{ rsyncnet_user }}@{{ rsyncnet_server }}:{{ canonical_server_client + '-' + canonical_hostname }} | tail -n1 | cut -f 1 -d ' '
+    shell: borg list --last 1 --short --remote-path /usr/local/bin/borg1/borg1 {{ rsyncnet_user }}@{{ rsyncnet_server }}:{{ canonical_server_client + '-' + canonical_hostname }}
     environment:
       BORG_PASSPHRASE: "{{ lookup('passwordstore', canonical_server_client + '/' + canonical_hostname + '/borg/remote') }}"
     args:
@@ -186,6 +215,14 @@
   become_user: root
   when: civicrm == 'Yes'
 
+# Another hack.  Temporary enough that I'm not doing anything further.
+- name: Convert MySQL 8-only collation
+  command: perl -pi -e 's/collation_connection  = utf8mb4_0900_ai_ci/collation_connection  = utf8mb4_general_ci/g' {{ canonical_crm_db_name }}.sql
+  args:
+    chdir: "{{ sql_dumps_dir }}"
+  become_user: root
+  when: civicrm == 'Yes' and run_as_user == 'opsig'
+
 - name: Fix logging db triggers when using a separate db
   command: perl -pi -e 's/{{ canonical_crm_logging_db_name }}/{{ crm_logging_db_name }}/g' {{ canonical_crm_db_name }}.sql
   args:
@@ -232,3 +269,27 @@
   become_user: "{{ run_as_user }}"
   failed_when: false
   when: cms == 'WordPress' and wordpress_installed.rc == 0 and env == 'Dev'
+
+- name: cv flush
+  shell: "PATH=$HOME/bin:$PATH;cv flush --cwd {{ webroot }}"
+  when: civicrm == 'Yes'
+  become: yes
+  become_user: "{{ run_as_user }}"
+
+- name: drush cc all
+  shell: "PATH=$HOME/bin:$PATH;drush cc all -y --root={{ webroot }}"
+  when: cms == 'Drupal8'
+  become: yes
+  become_user: "{{ run_as_user }}"
+
+- name: drush cr
+  shell: "PATH=$HOME/bin:$PATH;drush cr --root={{ webroot }}"
+  when: cms == 'Drupal'
+  become: yes
+  become_user: "{{ run_as_user }}"
+
+- name: wp cache flush
+  shell: "PATH=$HOME/bin:$PATH;wp cache flush --path={{ webroot }}"
+  when: cms == 'WordPress'
+  become: yes
+  become_user: "{{ run_as_user }}"
