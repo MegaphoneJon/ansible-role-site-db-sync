@@ -278,13 +278,13 @@
 
 - name: drush cc all
   shell: "PATH=$HOME/bin:$PATH;drush cc all -y --root={{ webroot }}"
-  when: cms == 'Drupal8'
+  when: cms == 'Drupal'
   become: yes
   become_user: "{{ run_as_user }}"
 
 - name: drush cr
   shell: "PATH=$HOME/bin:$PATH;drush cr --root={{ webroot }}"
-  when: cms == 'Drupal'
+  when: cms == 'Drupal8'
   become: yes
   become_user: "{{ run_as_user }}"
 
