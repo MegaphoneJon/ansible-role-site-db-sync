@@ -9,6 +9,16 @@
     recurse: yes
   become: yes
 
+- name: Ensure file owner/perms are correct (git)
+  file:
+    path: "{{ gitroot }}/.git"
+    state: directory
+    mode: ug+rw
+    owner: "{{ run_as_user }}"
+    group: "{{ run_as_user }}"
+    recurse: yes
+  become: yes
+
 - name: git pull
   git:
     repo: "{{ git_repo_url }}"
