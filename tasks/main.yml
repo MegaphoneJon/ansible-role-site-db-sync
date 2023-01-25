@@ -263,7 +263,7 @@
     command: install
     working_dir: "{{ gitroot }}"
   when: cms == "Drupal8"
-  become_user: "{{ run_as_user }}
+  become_user: "{{ run_as_user }}"
 
 - name: Turn off Nagios cron check on dev/test sites
   command: "drush --root={{ webroot }} -y vset nagios_func_cron 0"
