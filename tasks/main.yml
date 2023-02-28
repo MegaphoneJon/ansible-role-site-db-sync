@@ -47,6 +47,12 @@
   set_fact:
     from_site: "{{ from|default(canonical_primary_url) }}"
 
+- name: Use the empty logging db
+  ansible.builtin.set_fact:
+    canonical_crm_logging_db_name: "{{ canonical_crm_logging_db_name }}_structure"
+  when: sync_type == 'quick' and civicrm == 'Yes' and canonical_crm_logging_db_name is not none
+  become_user: root
+
 - name: create a list of db names
   set_fact:
     canonical_db_names:
