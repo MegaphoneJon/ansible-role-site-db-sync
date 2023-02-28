@@ -1,4 +1,8 @@
 ---
+- name: Set sync type
+  ansible.builtin.set_fact:
+    sync_type: "{{ sync_type | default('quick', true) }}"
+
 - name: Ensure file owner/perms are correct
   file:
     path: "{{ webroot }}"
@@ -198,6 +202,20 @@
   become_user: root
   loop_control:
     loop_var: db_name
+
+# Speed optimizations
+- block:
+  - name: Strip out logging table data.
+    command: perl -pi -e 's#^INSERT INTO `log_civicrm_.*##g;' {{ crm_logging_db_name | default(crm_db_name, true) }}.sql
+    args:
+      chdir: "{{ sql_dumps_dir }}"
+
+  - name: Strip out data on big useless tables.
+    command: perl -pi -e 's#^INSERT INTO `civicrm_mailing_event_.*##g; s#^INSERT INTO `civicrm_mailing_recipients.*##g; s#^INSERT INTO `civicrm_(?:job_)?log.*##g;' {{ crm_db_name }}.sql
+    args:
+      chdir: "{{ sql_dumps_dir }}"
+  when: sync_type == 'quick' and civicrm == 'Yes'
+  become_user: root
 
 - name: Remove trigger/view/function definers from Civi db
   command: perl -pi -e 's#\/\*\!5001. DEFINER=`.*`@`.*?\*\/##g; s/CREATE DEFINER.*FUNCTION/CREATE FUNCTION/g' {{ canonical_crm_db_name }}.sql
