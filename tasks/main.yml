@@ -168,6 +168,7 @@
     loop_control:
       loop_var: db_name
 
+#FIXME: Change to ansible.posix.synchronize
   - name: fetch db backups
     fetch:
       src: "/tmp/{{ db_name }}.sql"
