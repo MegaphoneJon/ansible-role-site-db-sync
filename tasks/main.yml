@@ -304,7 +304,7 @@
   when: cms == 'Drupal' and env == 'Dev'
 
 - name: Disable wp plugins that screw with login (on dev)
-  command: wp plugin deactivate advanced-nocaptcha-recaptcha ithemes-security-pro --path={{ webroot }}
+  command: wp plugin deactivate advanced-nocaptcha-recaptcha ithemes-security-pro wps-hide-login --path={{ webroot }}
   become_user: "{{ run_as_user }}"
   failed_when: false
   when: cms == 'WordPress' and env == 'Dev'
