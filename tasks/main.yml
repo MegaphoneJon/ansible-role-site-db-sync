@@ -235,13 +235,6 @@
   become_user: root
   when: civicrm == 'Yes'
 
-# - name: Remove function definers from Civi db
-#   command: perl -pi -e 's/CREATE DEFINER.*FUNCTION/CREATE FUNCTION/g' {{ canonical_crm_db_name }}.sql
-#   args:
-#     chdir: "{{ sql_dumps_dir }}"
-#   become_user: root
-#   when: civicrm == 'Yes'
-
 # Another hack.  Temporary enough that I'm not doing anything further.
 - name: Convert MySQL 8-only collation
   command: perl -pi -e 's/collation_connection  = utf8mb4_0900_ai_ci/collation_connection  = utf8mb4_general_ci/g' {{ canonical_crm_db_name }}.sql
