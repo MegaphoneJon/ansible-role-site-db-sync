@@ -32,7 +32,7 @@
     track_submodules: no
   become: yes
   become_user: "{{ run_as_user }}"
-  when: git_repo_name is not none
+  when: git_repo_url is not none
 
 # Currently the Ansible source code hard-codes the assumption that your branch is called "master".  When that's fixed, we can remove this and just set `track_submodules` to "yes" above.
 - name: git submodule update
@@ -42,7 +42,7 @@
   changed_when: false
   become: yes
   become_user: "{{ run_as_user }}"
-  when: git_repo_name is not none
+  when: git_repo_url is not none
 
 - name: Get the "from" site
   set_fact:
