@@ -1,9 +1,20 @@
 ---
-- name: Set sync type
+# Common to both with some quick sync code here.
+- name: Set some initial facts
   ansible.builtin.set_fact:
     sync_type: "{{ sync_type | default('quick', true) }}"
     client: "{{ short_name | default(canonical_server_client, true) }}"
+    repo_name: "{{ client + '-' + canonical_hostname }}"
+    passphrase: "{{ lookup('passwordstore', client + '/' + canonical_hostname + '/borg/remote') }}"
 
+# common to both
+- name: repo name and passhphrase is different when we do site-level backups
+  set_fact:
+    repo_name: "{{ client + '-' + canonical_hostname + '-' + canonical_bare_url }}"
+    passphrase: "{{ lookup('passwordstore', client + '/' + canonical_hostname + '/' + canonical_bare_url + '/borg/remote') }}"
+  when: monitor_backupninja|bool
+
+# unique to non-initial
 - name: Ensure file owner/perms are correct
   file:
     path: "{{ webroot }}"
@@ -14,6 +25,7 @@
     recurse: yes
   become: yes
 
+# unique to non-initial
 - name: Ensure file owner/perms are correct (git)
   file:
     path: "{{ gitroot }}/.git"
@@ -24,6 +36,7 @@
     recurse: yes
   become: yes
 
+# unique to non-initial
 - name: git pull
   git:
     repo: "{{ git_repo_url }}"
@@ -32,8 +45,9 @@
     track_submodules: no
   become: yes
   become_user: "{{ run_as_user }}"
-  when: git_repo_url is not none
+  when: git_repo_url is not none and pantheon_site_code is not defined
 
+# unique to non-initial
 # Currently the Ansible source code hard-codes the assumption that your branch is called "master".  When that's fixed, we can remove this and just set `track_submodules` to "yes" above.
 - name: git submodule update
   shell: git submodule update --remote
@@ -42,18 +56,16 @@
   changed_when: false
   become: yes
   become_user: "{{ run_as_user }}"
-  when: git_repo_url is not none
+  when: git_repo_url is not none and pantheon_site_code is not defined
 
-- name: Get the "from" site
-  set_fact:
-    from_site: "{{ from|default(canonical_primary_url) }}"
-
+# unique to non-initial
 - name: Use the empty logging db
   ansible.builtin.set_fact:
     canonical_crm_quicklogging_db_name: "{{ canonical_crm_logging_db_name }}_structure"
   when: sync_type == 'quick' and civicrm == 'Yes' and canonical_crm_logging_db_name is not none and db_sync_strategy != 'livedump'
   become_user: root
 
+# common to both, but has some unique code for quick db syncs.
 - name: create a list of db names
   set_fact:
     canonical_db_names:
@@ -65,11 +77,13 @@
       - "{{ crm_db_name }}"
       - "{{ crm_logging_db_name | default(crm_db_name, true) }}"
 
+# common to both
 - name: create a list of unique db names, removing blanks
   set_fact:
     canonical_db_names_unique: "{{ canonical_db_names | select() | unique }}"
     db_names_unique: "{{ db_names | select() | unique }}"
 
+# unique to non-initial but why?
 # Normally, sql-dumps is parallel with the webroot.  In certain situations (when gitroot is above webroot) this folder may not exists and creating it screws up git cloning.  
 # In that situation, we'll use a temp directory and create sql-dumps next time, once we have a .gitignore in place.
 - name: Check if .gitignore exists
@@ -77,6 +91,7 @@
     path: "{{ gitroot }}/.gitignore"
   register: gitignore
 
+# unique to non-initial but why?
 - name: Create sql-dumps folder
   file:
     owner: "{{ run_as_user }}"
@@ -118,9 +133,9 @@
 # Acquire a backup from rsync.net
 - block:
   - name: Get the latest backup archive name
-    shell: borg list --last 1 --short --remote-path /usr/local/bin/borg1/borg1 {{ rsyncnet_user }}@{{ rsyncnet_server }}:{{ client + '-' + canonical_hostname }}
+    shell: borg list --last 1 --short --remote-path /usr/local/bin/borg1/borg1 {{ rsyncnet_user }}@{{ rsyncnet_server }}:{{ repo_name }}
     environment:
-      BORG_PASSPHRASE: "{{ lookup('passwordstore', client + '/' + canonical_hostname + '/borg/remote') }}"
+      BORG_PASSPHRASE: "{{ passphrase }}"
     args:
       chdir: "{{ sql_dumps_dir }}"
     register: archive_name
@@ -134,11 +149,11 @@
       path_depth: "{{ canonical_database_backup_path | default('var/backups/mysql/sqldump',true) | regex_replace('[^\/]', '') | count + 1 }}"
 
   - name: Download the latest copy of the database
-    shell: borg extract --strip-components {{ path_depth }} --remote-path /usr/local/bin/borg1/borg1 {{ rsyncnet_user }}@{{ rsyncnet_server }}:{{ client + '-' + canonical_hostname }}::{{ archive_name.stdout }} {{ canonical_database_backup_path | default("var/backups/mysql/sqldump",true) }}/{{ db_name }}.sql.gz
+    shell: borg extract --strip-components {{ path_depth }} --remote-path /usr/local/bin/borg1/borg1 {{ rsyncnet_user }}@{{ rsyncnet_server }}:{{ repo_name }}::{{ archive_name.stdout }} {{ canonical_database_backup_path | default("var/backups/mysql/sqldump",true) }}/{{ db_name }}.sql.gz
     args:
       chdir: "{{ sql_dumps_dir }}"
     environment:
-      BORG_PASSPHRASE: "{{ lookup('passwordstore', client + '/' + canonical_hostname + '/borg/remote') }}"
+      BORG_PASSPHRASE: "{{ passphrase }}"
     with_items: "{{ canonical_db_names_unique }}"
     register: db_downloaded
     loop_control:
