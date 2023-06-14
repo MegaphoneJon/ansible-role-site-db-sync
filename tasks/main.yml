@@ -140,7 +140,6 @@
       BORG_PASSPHRASE: "{{ passphrase }}"
     register: archive_name
     changed_when: false
-    delegate_to: 127.0.0.1
 
   # Download the borg backup of the db dump if we need an update and the borg backup exists.
   # Also very ugly.  Borg doesn't allow specifying a destination path, so we use strip-components, but need to figure out how many components the path has.
