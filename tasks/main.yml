@@ -48,7 +48,7 @@
     version: "{{ git_main_branch }}"
     track_submodules: no
   become_user: "{{ run_as_user }}"
-  when: git_repo_url is not none and pantheon_site_code is not defined
+  when: git_repo_url is not none and (pantheon_site_code is not defined or pantheon_site_code == None)
 
 # unique to non-initial
 # Currently the Ansible source code hard-codes the assumption that your branch is called "master".  When that's fixed, we can remove this and just set `track_submodules` to "yes" above.
@@ -58,7 +58,7 @@
     chdir: "{{ gitroot }}"
   changed_when: false
   become_user: "{{ run_as_user }}"
-  when: git_repo_url is not none and pantheon_site_code is not defined
+  when: git_repo_url is not none and (pantheon_site_code is not defined or pantheon_site_code == None)
 
 # unique to non-initial
 - name: Use the empty logging db
