@@ -3,19 +3,19 @@
 - name: Set some initial facts
   ansible.builtin.set_fact:
     sync_type: "{{ sync_type | default('quick', true) }}"
-    client: "{{ short_name | default(canonical_server_client, true) }}"
+    client: "{{ short_name | default(client, true) }}"
 
 - name: More initial facts - for borg restores only
   set_fact:
     repo_name: "{{ client + '-' + canonical_hostname }}"
-    passphrase: "{{ lookup('passwordstore', client + '/' + canonical_hostname + '/borg/remote') }}"
+    passphrase: "{{ lookup('passwordstore', canonical_server_client + '/' + canonical_hostname + '/borg/remote') }}"
   when: db_sync_strategy == 'rsyncnet'
 
 # common to both
 - name: repo name and passhphrase is different when we do site-level backups
   set_fact:
     repo_name: "{{ client + '-' + canonical_hostname + '-' + canonical_bare_url }}"
-    passphrase: "{{ lookup('passwordstore', client + '/' + canonical_hostname + '/' + canonical_bare_url + '/borg/remote') }}"
+    passphrase: "{{ lookup('passwordstore', canonical_server_client + '/' + canonical_hostname + '/' + canonical_bare_url + '/borg/remote') }}"
   when: monitor_backupninja|bool
 
 # unique to non-initial
