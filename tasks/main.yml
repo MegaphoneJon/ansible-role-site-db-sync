@@ -4,6 +4,8 @@
   ansible.builtin.set_fact:
     sync_type: "{{ sync_type | default('quick', true) }}"
     client: "{{ short_name | default(client, true) }}"
+    canonical_server_client: "{{ canonical_site_short_name | default(canonical_server_client, true) }}"
+
 
 - name: More initial facts - for borg restores only
   set_fact:
