@@ -206,8 +206,8 @@
   - name: Log in to Terminus
     command: "terminus auth:login --machine-token={{ lookup('passwordstore', client + '/pantheonmachinetoken') }}"
 
-  - name: Create a Pantheon backup
-    command: "terminus backup:create {{ pantheon_site_code }}.live --element=db --keep-for=1"
+#  - name: Create a Pantheon backup
+#    command: "terminus backup:create {{ pantheon_site_code }}.live --element=db --keep-for=1"
 
   - name: Retrieve the Pantheon backup
     command: "terminus backup:get {{ pantheon_site_code }}.live --element=db --to={{ sql_dumps_dir }}/{{ canonical_cms_db_name }}.sql.gz"
