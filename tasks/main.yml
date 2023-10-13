@@ -248,11 +248,11 @@
 
 # Another hack.  Temporary enough that I'm not doing anything further.
 - name: Convert MySQL 8-only collation
-  command: perl -pi -e 's/collation_connection  = utf8mb4_0900_ai_ci/collation_connection  = utf8mb4_general_ci/g' {{ canonical_crm_db_name }}.sql
+  command: perl -pi -e 's/collation_connection += utf8mb4_0900_ai_ci/collation_connection = utf8mb4_general_ci/g' {{ canonical_crm_db_name }}.sql
   args:
     chdir: "{{ sql_dumps_dir }}"
   become_user: root
-  when: civicrm == 'Yes' and run_as_user == 'opsig'
+  when: civicrm == 'Yes' and (run_as_user == 'opsig' or run_as_user is search("nasco"))
 
 - name: Fix logging db triggers when using a separate db
   command: perl -pi -e 's/{{ canonical_crm_logging_db_name }}/{{ crm_logging_db_name }}/g' {{ canonical_crm_db_name }}.sql
