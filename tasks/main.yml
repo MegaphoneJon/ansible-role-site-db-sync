@@ -113,8 +113,10 @@
 
 - name: Set the sql-dumps directory var
   set_fact:
+    # This is the directory on the server where the db will actually be imported.
     sql_dumps_dir: "{{ sqldumps_path if dumps_dir.stat.exists else '/tmp' }}"
-
+    # This is where a live dump is downloaded, which is different if we're pulling to a non-local server.
+    sql_dumps_download_dir: "{{ sqldumps_path if dumps_dir.stat.exists and group_names is search('localhost') else '/tmp' }}"
 
 # MySQL restore
 - name: Check if db dump files already exist
@@ -185,11 +187,11 @@
     loop_control:
       loop_var: db_name
 
-#FIXME: Change to ansible.posix.synchronize
+  #FIXME: Change to ansible.posix.synchronize. But is screwed up because "synchronize" treats "delegate_to" differently.
   - name: fetch db backups
     fetch:
       src: "/tmp/{{ db_name }}.sql"
-      dest: "{{ sql_dumps_dir }}/{{ db_name }}.sql"
+      dest: "{{ sql_dumps_download_dir }}/{{ db_name }}.sql"
       flat: yes
     with_items: "{{ canonical_db_names_unique }}"
     become_user: "{{ run_as_user }}"
@@ -200,6 +202,17 @@
   delegate_to: "{{ canonical_server }}"
   remote_user: "{{ canonical_run_as_user }}"
   become: no
+
+- name: Send live dumps to destination server
+  ansible.posix.synchronize:
+    src: "{{ sql_dumps_download_dir }}/{{ db_name }}.sql"
+    dest: "{{ sql_dumps_dir }}/{{ db_name }}.sql"
+    mode: push
+  when: acquire_db_backup.msg == "yes" and db_sync_strategy == 'livedump'
+  become: no
+  with_items: "{{ canonical_db_names_unique }}"
+  loop_control:
+    loop_var: db_name
 
 # Acquire a backup from Pantheon
 - block:
@@ -221,7 +234,7 @@
 
 - name: Set owner/group for db dumps
   ansible.builtin.file:
-    path: "{{ sql_dumps_dir }}/{{ db_name }}.sql"
+    path: "{{ sql_dumps_download_dir }}/{{ db_name }}.sql"
     owner: "{{ run_as_user }}"
     group: "{{ run_as_user }}"
     mode: 0660
@@ -229,6 +242,8 @@
   become_user: root
   loop_control:
     loop_var: db_name
+  # Not on livedumps we don't.
+  when: db_sync_strategy == 'rsyncnet'
 
 # Speed optimizations
 - block:
@@ -268,7 +283,7 @@
   when: canonical_crm_logging_db_name is not none and civicrm == 'Yes' and canonical_crm_logging_db_name != canonical_crm_db_name
   become_user: root
   with_items:
-   - "{{ canonical_crm_quicklogging_db_name }}"
+   - "{{ canonical_crm_quicklogging_db_name|default('none', True) }}"
    - "{{ canonical_crm_logging_db_name }}"
 
 - name: Ensure the CMS is installed
@@ -281,6 +296,7 @@
     name: "{{ item.1 }}"
     target: "{{ sql_dumps_dir }}/{{ item.0 }}.sql"
     state: import
+    login_host: "{{ db_host|default('localhost') }}"
     login_user: "{{ db_user }}"
     login_password: "{{ lookup('passwordstore', client + '/' + hostname + '/' + bare_url + '/mysql') }}"
   when: item.1 is defined and cms_exists.stat is defined and cms_exists.stat.exists == true and canonical_primary_url
