@@ -6,7 +6,6 @@
     client: "{{ short_name | default(client, true) }}"
     canonical_server_client: "{{ canonical_site_short_name | default(canonical_server_client, true) }}"
 
-
 - name: More initial facts - for borg restores only
   set_fact:
     repo_name: "{{ canonical_server_client + '-' + canonical_hostname }}"
@@ -116,7 +115,7 @@
     # This is the directory on the server where the db will actually be imported.
     sql_dumps_dir: "{{ sqldumps_path if dumps_dir.stat.exists else '/tmp' }}"
     # This is where a live dump is downloaded, which is different if we're pulling to a non-local server.
-    sql_dumps_download_dir: "{{ sqldumps_path if dumps_dir.stat.exists and group_names is search('localhost') else '/tmp' }}"
+    sql_dumps_download_dir: "{{ sqldumps_path if (dumps_dir.stat.exists and group_names is search('localhost')) or db_sync_strategy != 'livedump' else '/tmp' }}"
 
 # MySQL restore
 - name: Check if db dump files already exist
