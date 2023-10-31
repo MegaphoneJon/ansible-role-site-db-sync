@@ -290,8 +290,15 @@
     path: "{{ webroot }}/index.php"
   register: cms_exists
 
+- name: Drop the databases
+  community.mysql.mysql_db:
+    name:
+      - "{{ item }}"
+    state: absent
+  with_items: "{{ db_names_unique }}"
+
 - name: Import the databases
-  mysql_db:
+  community.mysql.mysql_db:
     name: "{{ item.1 }}"
     target: "{{ sql_dumps_dir }}/{{ item.0 }}.sql"
     state: import
