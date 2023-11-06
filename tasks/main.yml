@@ -247,7 +247,7 @@
 # Speed optimizations
 - block:
   - name: Strip out data on big useless tables.
-    command: perl -pi -e 'BEGIN{undef $/;} s#-- Dumping data for table `(?:log_civicrm\w+|civicrm_mailing_event\w+|civicrm_(?:job_)?log|civicrm_mailing_recipients)`.--.*?--\n##sg; s#-- Dumping data for table `civicrm_mailing_event\w+`.--.*?--\n##sg; s#-- Dumping data for table `log_civicrm\w+`.--.*?--\n##sg;' {{ canonical_crm_db_name }}.sql
+    command: perl -pi -e 'BEGIN{undef $/;} s#-- Dumping data for table `(?:log_civicrm\w+|civicrm_mailing_event\w+|civicrm_(?:job_)?log|civicrm_mailing_recipients)`.--.*?--\n##sg' {{ canonical_crm_db_name }}.sql
     args:
       chdir: "{{ sql_dumps_dir }}"
   when: sync_type == 'quick' and civicrm == 'Yes'
