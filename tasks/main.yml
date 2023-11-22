@@ -246,8 +246,10 @@
 
 # Speed optimizations
 - block:
+  # Use `sed` here because Perl runs out of RAM on multiline comparisons on files over a certain size.
+  # `-E` allows extended regex like \w.  Separating two regexes with a comma handles all lines from A to B. `d` deletes them.
   - name: Strip out data on big useless tables.
-    command: perl -pi -e 'BEGIN{undef $/;} s#-- Dumping data for table `(?:log_civicrm\w+|civicrm_mailing_event\w+|civicrm_(?:job_)?log|civicrm_mailing_recipients)`.--.*?--\n##sg' {{ canonical_crm_db_name }}.sql
+    command: sed -E '/-- Dumping data for table `(log_civicrm\w+|civicrm_mailing_event\w+|civicrm_(job_)?log|civicrm_mailing_recipients)`/,/UNLOCK TABLES/d' {{ canonical_crm_db_name }}.sql
     args:
       chdir: "{{ sql_dumps_dir }}"
   when: sync_type == 'quick' and civicrm == 'Yes'
