@@ -182,6 +182,7 @@
       name: "{{ db_name }}"
       target: "/tmp/{{ db_name }}.sql"
       single_transaction: true
+      dump_extra_args: "{% if db_name == canonical_crm_logging_db_name and sync_type == 'quick' %}--no-data{% endif %}"
     with_items: "{{ canonical_db_names_unique }}"
     loop_control:
       loop_var: db_name
@@ -207,6 +208,7 @@
     src: "{{ sql_dumps_download_dir }}/{{ db_name }}.sql"
     dest: "{{ sql_dumps_dir }}/{{ db_name }}.sql"
     mode: push
+
   when: acquire_db_backup.msg == "yes" and db_sync_strategy == 'livedump'
   become: no
   with_items: "{{ canonical_db_names_unique }}"
