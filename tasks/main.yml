@@ -367,7 +367,7 @@
   become_user: "{{ run_as_user }}"
 
 - name: drush cr
-  shell: "PATH=$HOME/bin:$PATH;drush cr --root={{ webroot }}"
+  shell: "PATH=$HOME/bin:$PATH;{{ gitroot }}/vendor/bin/drush cr --root={{ webroot }}"
   when: cms == 'Drupal8'
   become_user: "{{ run_as_user }}"
 
