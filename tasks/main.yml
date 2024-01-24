@@ -182,7 +182,7 @@
       name: "{{ db_name }}"
       target: "/tmp/{{ db_name }}.sql"
       single_transaction: true
-      dump_extra_args: "{% if db_name == canonical_crm_logging_db_name and sync_type == 'quick' %}--no-data{% endif %}"
+      dump_extra_args: "{% if db_name == canonical_crm_logging_db_name and sync_type == 'quick' %}--no-data{% else %}--routines{% endif %}"
     with_items: "{{ canonical_db_names_unique }}"
     loop_control:
       loop_var: db_name
