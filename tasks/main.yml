@@ -48,6 +48,8 @@
     dest: "{{ gitroot }}"
     version: "{{ git_main_branch }}"
     track_submodules: no
+    key_file: "{{ ssh_key_location + '/id_ed25519' if ssh_key_location is defined }}"
+    ssh_opts: "{{ '-o UserKnownHostsFile=' + ssh_key_location + '/known_hosts' if ssh_key_location is defined }}"    
   become_user: "{{ run_as_user }}"
   when: git_repo_url is not none and (pantheon_site_code is not defined or pantheon_site_code == None)
 
@@ -141,6 +143,7 @@
     shell: borg list --last 1 --short --remote-path /usr/local/bin/borg1/borg1 {{ rsyncnet_user }}@{{ rsyncnet_server }}:{{ repo_name }}
     environment:
       BORG_PASSPHRASE: "{{ passphrase }}"
+      BORG_RSH: "{{ 'ssh -o UserKnownHostsFile=' + ssh_key_location + '/known_hosts -i ' + ssh_key_location + '/id_ed25519' if ssh_key_location is defined else 'ssh' }}"
     register: archive_name
     changed_when: false
 
@@ -156,6 +159,7 @@
       chdir: "{{ sql_dumps_dir }}"
     environment:
       BORG_PASSPHRASE: "{{ passphrase }}"
+      BORG_RSH: "{{ 'ssh -o UserKnownHostsFile=' + ssh_key_location + '/known_hosts -i ' + ssh_key_location + '/id_ed25519' if ssh_key_location is defined else 'ssh' }}"
     with_items: "{{ canonical_db_names_unique }}"
     register: db_downloaded
     loop_control:
@@ -319,6 +323,7 @@
   composer:
     command: install
     working_dir: "{{ gitroot }}"
+    composer_executable: "{{ ansible_env.HOME + '/bin/composer' if 'mayfirst_ng_site' in group_names }}"
   when: cms == "Drupal8"
   become_user: "{{ run_as_user }}"
 
