@@ -144,6 +144,7 @@
     environment:
       BORG_PASSPHRASE: "{{ passphrase }}"
       BORG_RSH: "{{ 'ssh -o UserKnownHostsFile=' + ssh_key_location + '/known_hosts -i ' + ssh_key_location + '/id_ed25519' if ssh_key_location is defined else 'ssh' }}"
+      BORG_RELOCATED_REPO_ACCESS_IS_OK: "yes"
     register: archive_name
     changed_when: false
 
