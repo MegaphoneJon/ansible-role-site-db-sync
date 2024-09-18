@@ -5,19 +5,27 @@
     sync_type: "{{ sync_type | default('quick', true) }}"
     client: "{{ short_name | default(client, true) }}"
     canonical_server_client: "{{ canonical_site_short_name | default(canonical_server_client, true) }}"
+    use_obfuscated: "{{ true if sync_obfuscated_dbs is defined and sync_obfuscated_dbs is true else false }}"
+
+- name: test
+  set_fact:
+    my_var: "{{ client + ('_obfuscated' if use_obfuscated is true else '') }}"
+
 
 - name: More initial facts - for borg restores only
   set_fact:
     repo_name: "{{ canonical_server_client + '-' + canonical_hostname }}"
     passphrase: "{{ lookup('community.general.passwordstore', canonical_server_client + '/' + canonical_hostname + '/borg/remote') }}"
-  when: db_sync_strategy == 'rsyncnet'
+  when: db_sync_strategy == 'rsyncnet' and not monitor_backupninja|bool
+  no_log: true
 
 # common to both
 - name: repo name and passhphrase is different when we do site-level backups
   set_fact:
     repo_name: "{{ client + '-' + canonical_hostname + '-' + canonical_bare_url }}"
-    passphrase: "{{ lookup('community.general.passwordstore', canonical_server_client + '/' + canonical_hostname + '/' + canonical_bare_url + '/borg/remote') }}"
+    passphrase: "{{ lookup('community.general.passwordstore', client + '/' + canonical_hostname + '/' + canonical_bare_url + '/borg/remote') }}"
   when: monitor_backupninja|bool
+  no_log: true
 
 # unique to non-initial
 - name: Ensure file owner/perms are correct
@@ -74,9 +82,9 @@
 - name: create a list of db names
   set_fact:
     canonical_db_names:
-      - "{{ canonical_cms_db_name }}"
-      - "{{ canonical_crm_db_name }}"
-      - "{{ canonical_crm_quicklogging_db_name | default(canonical_crm_logging_db_name, true) | default(canonical_crm_db_name, true) }}"
+      - "{{ canonical_cms_db_name + ('_obfuscated' if use_obfuscated is true else '') }}"
+      - "{{ canonical_crm_db_name + ('_obfuscated' if use_obfuscated is true else '') }}"
+      - "{{ canonical_crm_quicklogging_db_name if use_obfuscated is true else canonical_crm_quicklogging_db_name | default(canonical_crm_logging_db_name, true) | default(canonical_crm_db_name, true) }}"
     db_names:
       - "{{ cms_db_name }}"
       - "{{ crm_db_name }}"
@@ -144,6 +152,7 @@
     environment:
       BORG_PASSPHRASE: "{{ passphrase }}"
       BORG_RSH: "{{ 'ssh -o UserKnownHostsFile=' + ssh_key_location + '/known_hosts -i ' + ssh_key_location + '/id_ed25519' if ssh_key_location is defined else 'ssh' }}"
+      BORG_RELOCATED_REPO_ACCESS_IS_OK: yes
     register: archive_name
     changed_when: false
 
@@ -159,7 +168,6 @@
       chdir: "{{ sql_dumps_dir }}"
     environment:
       BORG_PASSPHRASE: "{{ passphrase }}"
-      BORG_RSH: "{{ 'ssh -o UserKnownHostsFile=' + ssh_key_location + '/known_hosts -i ' + ssh_key_location + '/id_ed25519' if ssh_key_location is defined else 'ssh' }}"
     with_items: "{{ canonical_db_names_unique }}"
     register: db_downloaded
     loop_control:
@@ -224,8 +232,8 @@
   - name: Log in to Terminus
     command: "terminus auth:login --machine-token={{ lookup('community.general.passwordstore', client + '/pantheonmachinetoken') }}"
 
-#  - name: Create a Pantheon backup
-#    command: "terminus backup:create {{ pantheon_site_code }}.live --element=db --keep-for=1"
+  - name: Create a Pantheon backup
+    command: "terminus backup:create {{ pantheon_site_code }}.live --element=db --keep-for=1"
 
   - name: Retrieve the Pantheon backup
     command: "terminus backup:get {{ pantheon_site_code }}.live --element=db --to={{ sql_dumps_dir }}/{{ canonical_cms_db_name }}.sql.gz"
@@ -255,14 +263,14 @@
   # Use `sed` here because Perl runs out of RAM on multiline comparisons on files over a certain size.
   # `-E` allows extended regex like \w.  Separating two regexes with a comma handles all lines from A to B. `d` deletes them.
   - name: Strip out data on big useless tables.
-    command: sed -i -E '/-- Dumping data for table `(log_civicrm\w+|civicrm_mailing_event\w+|civicrm_(job_)?log|civicrm_mailing_recipients)`/,/UNLOCK TABLES/d' {{ canonical_crm_db_name }}.sql
+    command: sed -i -E '/-- Dumping data for table `(log_civicrm\w+|civicrm_mailing_event\w+|civicrm_(job_)?log|civicrm_mailing_recipients)`/,/UNLOCK TABLES/d' {{ canonical_crm_db_name + ('_obfuscated' if use_obfuscated is true else '') }}.sql
     args:
       chdir: "{{ sql_dumps_dir }}"
   when: sync_type == 'quick' and civicrm == 'Yes'
   become_user: root
 
 - name: Remove trigger/view/function definers from Civi db
-  command: perl -pi -e 's#\/\*\!5001. DEFINER=`.*`@`.*?\*\/##g; s/CREATE DEFINER.*FUNCTION/CREATE FUNCTION/g' {{ canonical_crm_db_name }}.sql
+  command: perl -pi -e 's#\/\*\!5001. DEFINER=`.*`@`.*?\*\/##g; s/CREATE DEFINER.*FUNCTION/CREATE FUNCTION/g' {{ canonical_crm_db_name + ('_obfuscated' if use_obfuscated is true else '') }}.sql
   args:
     chdir: "{{ sql_dumps_dir }}"
   become_user: root
@@ -270,14 +278,14 @@
 
 # Another hack.  Temporary enough that I'm not doing anything further.
 - name: Convert MySQL 8-only collation
-  command: perl -pi -e 's/collation_connection += utf8mb4_0900_ai_ci/collation_connection = utf8mb4_general_ci/g' {{ canonical_crm_db_name }}.sql
+  command: perl -pi -e 's/collation_connection += utf8mb4_0900_ai_ci/collation_connection = utf8mb4_general_ci/g' {{ canonical_crm_db_name + ('_obfuscated' if use_obfuscated is true else '') }}.sql
   args:
     chdir: "{{ sql_dumps_dir }}"
   become_user: root
   when: civicrm == 'Yes' and (run_as_user == 'opsig' or run_as_user is search("nasco"))
 
 - name: Fix logging db triggers when using a separate db
-  command: perl -pi -e 's/{{ canonical_crm_logging_db_name }}/{{ crm_logging_db_name }}/g' {{ canonical_crm_db_name }}.sql
+  command: perl -pi -e 's/{{ canonical_crm_logging_db_name }}/{{ crm_logging_db_name }}/g' {{ canonical_crm_db_name + ('_obfuscated' if use_obfuscated is true else '') }}.sql
   args:
     chdir: "{{ sql_dumps_dir }}"
   when: canonical_crm_logging_db_name is not none and civicrm == 'Yes'
@@ -323,7 +331,7 @@
   composer:
     command: install
     working_dir: "{{ gitroot }}"
-    composer_executable: "{{ ansible_env.HOME + '/bin/composer' if 'mayfirst_ng_site' in group_names }}"
+    composer_executable: "{{ ansible_env.HOME + '/bin/composer' if 'mayfirst_ng_site' in group_names else omit }}"
   when: cms == "Drupal8"
   become_user: "{{ run_as_user }}"
 
