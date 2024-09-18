@@ -24,7 +24,7 @@
   set_fact:
     repo_name: "{{ client + '-' + canonical_hostname + '-' + canonical_bare_url }}"
     passphrase: "{{ lookup('community.general.passwordstore', client + '/' + canonical_hostname + '/' + canonical_bare_url + '/borg/remote') }}"
-  when: monitor_backupninja|bool
+  when: db_sync_strategy == 'rsyncnet' and monitor_backupninja|bool
   no_log: true
 
 # unique to non-initial
@@ -152,7 +152,7 @@
     environment:
       BORG_PASSPHRASE: "{{ passphrase }}"
       BORG_RSH: "{{ 'ssh -o UserKnownHostsFile=' + ssh_key_location + '/known_hosts -i ' + ssh_key_location + '/id_ed25519' if ssh_key_location is defined else 'ssh' }}"
-      BORG_RELOCATED_REPO_ACCESS_IS_OK: yes
+      BORG_RELOCATED_REPO_ACCESS_IS_OK: "yes"
     register: archive_name
     changed_when: false
 
