@@ -168,6 +168,7 @@
       chdir: "{{ sql_dumps_dir }}"
     environment:
       BORG_PASSPHRASE: "{{ passphrase }}"
+      BORG_RSH: "{{ 'ssh -o UserKnownHostsFile=' + ssh_key_location + '/known_hosts -i ' + ssh_key_location + '/id_ed25519' if ssh_key_location is defined else 'ssh' }}"
     with_items: "{{ canonical_db_names_unique }}"
     register: db_downloaded
     loop_control:
