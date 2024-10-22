@@ -148,7 +148,7 @@
 # Acquire a backup from rsync.net
 - block:
   - name: Get the latest backup archive name
-    shell: borg list --last 1 --short --remote-path /usr/local/bin/borg1/borg1 {{ rsyncnet_user }}@{{ rsyncnet_server }}:{{ repo_name }}
+    shell: borg list {{ '--glob-archives=*' + backup_date if backup_date is defined }} --last 1 --short --remote-path /usr/local/bin/borg1/borg1 {{ rsyncnet_user }}@{{ rsyncnet_server }}:{{ repo_name }}
     environment:
       BORG_PASSPHRASE: "{{ passphrase }}"
       BORG_RSH: "{{ 'ssh -o UserKnownHostsFile=' + ssh_key_location + '/known_hosts -i ' + ssh_key_location + '/id_ed25519' if ssh_key_location is defined else 'ssh' }}"
