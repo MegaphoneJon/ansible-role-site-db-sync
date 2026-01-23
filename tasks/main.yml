@@ -50,6 +50,7 @@
   when: run_as_user != ansible_user
 
 # unique to non-initial
+# FIXME: docker_dev should be able to git pull but run_as_user is me and my SSH key has a passphrase.
 - name: git pull
   git:
     repo: "{{ git_repo_url }}"
@@ -59,7 +60,7 @@
     key_file: "{{ ssh_key_location + '/id_ed25519' if ssh_key_location is defined }}"
     ssh_opts: "{{ '-o UserKnownHostsFile=' + ssh_key_location + '/known_hosts' if ssh_key_location is defined }}"    
   become_user: "{{ run_as_user }}"
-  when: git_repo_url is not none and (pantheon_site_code is not defined or pantheon_site_code == None)
+  when: git_repo_url is not none and (pantheon_site_code is not defined or pantheon_site_code == None) and 'docker_dev' not in group_names
 
 # unique to non-initial
 # Currently the Ansible source code hard-codes the assumption that your branch is called "master".  When that's fixed, we can remove this and just set `track_submodules` to "yes" above.
