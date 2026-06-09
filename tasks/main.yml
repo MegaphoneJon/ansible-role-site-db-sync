@@ -57,8 +57,8 @@
     dest: "{{ gitroot }}"
     version: "{{ git_main_branch }}"
     track_submodules: no
-    key_file: "{{ ssh_key_location + '/id_ed25519' if ssh_key_location is defined }}"
-    ssh_opts: "{{ '-o UserKnownHostsFile=' + ssh_key_location + '/known_hosts' if ssh_key_location is defined }}"    
+    key_file: "{{ ssh_key_location + '/id_ed25519' if ssh_key_location is defined else omit }}"
+    ssh_opts: "{{ '-o UserKnownHostsFile=' + ssh_key_location + '/known_hosts' if ssh_key_location is defined else omit }}"
   become_user: "{{ run_as_user }}"
   when: git_repo_url is not none and (pantheon_site_code is not defined or pantheon_site_code == None) and 'docker_dev' not in group_names
 
@@ -141,7 +141,7 @@
 - name: Update the dump if a canonical db exists unless a dump already exists and is < 24hrs old
   assert:
     that:
-      - "(canonical_hostname is none and db_sync_strategy != 'pantheon') or (db_dump.stat.exists == true and (ansible_date_time.epoch|int - db_dump.stat.mtime) < (60 * 60 * 24))"
+      - "(canonical_hostname is none and db_sync_strategy != 'pantheon') or (db_dump.stat.exists == true and (ansible_facts.date_time.epoch|int - db_dump.stat.mtime) < (60 * 60 * 24))"
     fail_msg: "yes"
   failed_when: false
   register: acquire_db_backup
@@ -323,7 +323,7 @@
     login_host: "{{ db_host|default('localhost') }}"
     login_user: "{{ db_user }}"
     login_password: "{{ lookup('community.general.passwordstore', client + '/' + hostname + '/' + bare_url + '/mysql') }}"
-  when: item.1 is defined and cms_exists.stat is defined and cms_exists.stat.exists == true and canonical_primary_url
+  when: item.1 is defined and cms_exists.stat is defined and cms_exists.stat.exists == true and canonical_primary_url is defined
   become_user: root
   with_together:
    - "{{ canonical_db_names_unique }}"
@@ -333,7 +333,7 @@
   composer:
     command: install
     working_dir: "{{ gitroot }}"
-    composer_executable: "{{ ansible_env.HOME + '/bin/composer' if 'mayfirst_ng_site' in group_names else omit }}"
+    composer_executable: "{{ ansible_facts.env.HOME + '/bin/composer' if 'mayfirst_ng_site' in group_names else omit }}"
     executable: "{{ php_path|default(omit) }}"
   when: cms == "Drupal8"
   become_user: "{{ run_as_user }}"
