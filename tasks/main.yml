@@ -372,6 +372,15 @@
   failed_when: false
   when: cms == 'WordPress' and env == 'Dev'
 
+- name: Disable Wordfence scans on dev
+  command: wp eval 'if (defined("WORDFENCE_EPOCH")) { $t = wfConfig::get("scan_maxDuration"); if ($t != 1) { wfConfig::set("scan_maxDuration", "1");} echo $t; }' --path={{ webroot }}
+  become_user: "{{ run_as_user }}"
+  changed_when: wordfence_change.stdout != '1' and wordfence_change.stdout != ''
+  register: wordfence_change
+  #failed_when: false
+  when: cms == 'WordPress' and env == 'Dev'
+  tags: wordfence-debug
+
 - name: cv flush
   shell: "PATH=$HOME/bin:$PATH;cv flush --cwd {{ webroot }}"
   when: civicrm == 'Yes'
