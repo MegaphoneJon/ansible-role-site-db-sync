@@ -83,11 +83,11 @@
 - name: create a list of db names
   set_fact:
     canonical_db_names:
-      - "{{ canonical_cms_db_name + ('_obfuscated' if use_obfuscated is true else '') }}"
+      - "{{ canonical_cms_db_name | default(none, true) + ('_obfuscated' if use_obfuscated is true else '') }}"
       - "{{ canonical_crm_db_name + ('_obfuscated' if use_obfuscated is true else '') }}"
       - "{{ canonical_crm_quicklogging_db_name if use_obfuscated is true else canonical_crm_quicklogging_db_name | default(canonical_crm_logging_db_name, true) | default(canonical_crm_db_name, true) }}"
     db_names:
-      - "{{ cms_db_name }}"
+      - "{{ cms_db_name | default(none, true) }}"
       - "{{ crm_db_name }}"
       - "{{ crm_logging_db_name | default(crm_db_name, true) }}"
 
